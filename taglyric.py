@@ -6,36 +6,55 @@ import os.path # Used to determine if files exist.
 import eyed3 # mp3 file tagger
 
 import urllib2 # used to make http requests to lyric databases
-
-import re
+import re # regular expression library used to strip strings
 
 def lyrics_url(e_file):
     url =  "lyrics.com/"
+
+    # Remove any non ascii characters from the title and artist strings.
     title = e_file.tag.title
     title = title.encode('ascii', 'ignore')
+    title = re.sub('[()]', '', title)
 
     artist = e_file.tag.artist
     artist = artist.encode('ascii', 'ignore')
 
     url = url                           \
-        + re.sub(' ', '-', title)       \
+        + re.sub(r'\W+', '-', title)       \
         + "-lyrics-"                    \
-        + re.sub(' ', '-', artist)      \
+        + re.sub(r'\W+', '-', artist)      \
         + ".html"
 
-    print url
+    return url
 
 def azlyrics_url(e_file):
-    url = "azlyrics.com"
+    url = "azlyrics.com/lyrics/"
 
-    print url
+    # Remove any non ascii characters from title and artist strings.
+    title = e_file.tag.title
+    title = title.encode('ascii', 'ignore')
+    title = title.lower()
+
+    artist = e_file.tag.artist
+    artist = artist.encode('ascii', 'ignore')
+    artist = artist.lower()
+
+    # Strip non alphanumeric characters from title and artist strings.
+    url = url                           \
+        + re.sub(r'\W+', '', artist)    \
+        + "/"                           \
+        + re.sub(r'\W+', '', title)     \
+        + ".html"
+
+    return url
 
 lyricDatabases = {0 : lyrics_url,
                   1 : azlyrics_url}
 
 
 def generate_lyrics(file):
-    "Generates a lyric url. Searches through each of the available databases until lyrics are found"
+    "Generates a lyric url. Searches through each of the available databases \
+    until lyrics are found"
 
     e_file = eyed3.load(file)
     for i in lyricDatabases:
@@ -43,11 +62,13 @@ def generate_lyrics(file):
 
 
 def is_mp3_file(file):
-    "Returns true if file argument is an mp3 file that exists in the current system. False otherwise"
+    "Returns true if file argument is an mp3 file that exists in the current \
+    system. False otherwise"
     return (os.path.isfile(file)) and (file.endswith('.mp3'))
 
 def tag_lyric(file):
-    "Tags the file specified in the argument with lyrics. If an invalid file is passed, function will return -1"
+    "Tags the file specified in the argument with lyrics. If an invalid file \
+    is passed, function will return -1"
     if not(is_mp3_file(file)):
         return -1
 
@@ -61,7 +82,8 @@ def tag_lyric(file):
     return
 
 def tag_artist(file):
-    "Tags the file specified in the argument with the artist. If an invalid file is passed, function will return -1"
+    "Tags the file specified in the argument with the artist. If an invalid \
+    file is passed, function will return -1"
     if not(is_mp3_file(file)):
         return -1
 
@@ -90,6 +112,34 @@ def print_tags(file):
     print "Song artist: ", e_file.tag.artist
     print "-----------------------------------------"
 
+def test_lyric_urls():
+    "This method prints the url formatting of each database with the title \
+    and artist strings from stdin. This method relies on the mp3 file       \
+    'test.mp3' existing in the current working directory"
+
+    if not(os.path.isfile("test.mp3")):
+         print "Please make sure the file 'test.mp3' exists in the current", \
+         "working directory and is a valid mp3 file"
+         exit(0)
+
+    print "mp3 Title: ",
+    title = raw_input()
+    print "mp3 Artist: ",
+    artist = raw_input()
+
+    e_file = eyed3.load("test.mp3")
+    # Strings must be converted to unicode before eyed3 will process them
+    # even though we encode back to ascii in the url functions. This is okay
+    # since this method will only be called during testing.
+    e_file.tag.title = unicode(title, "UTF-8")
+    e_file.tag.artist = unicode(artist, "UTF-8")
+
+    e_file.tag.save()
+
+    for i in lyricDatabases:
+        url = lyricDatabases[i](e_file)
+        print lyricDatabases[i].__name__, ": ", url
+
 parser = argparse.ArgumentParser()
 
 parser.add_argument('-a', action="store_true", default=False,
@@ -101,10 +151,17 @@ help = "Include this argument if you want to manually embed the title name in th
 parser.add_argument('-p', action="store_true", default=False,
 help = "Include this argument if you want to see a print out of each files current tags")
 
+parser.add_argument('--test', action="store_true", default=False)
+
 parser.add_argument('mp3', nargs = '*', help = "Path to mp3 file you want tagged")
 
 try:
     args = parser.parse_args()
+
+    if (args.test):
+        test_lyric_urls()
+        exit(0)
+
     if(len(args.mp3) == 0):
         print "Nothing to do"
         exit(0)
