@@ -3,13 +3,25 @@
 import argparse # Argument parsing library.
 import sys # Used to call system.exit().
 import os.path # Used to determine if files exist.
-import eyed3 # mp3 file tagger
+import eyed3 # DEPENDENCY mp3 file tagger
+from eyed3.id3 import ID3_V1_0, ID3_V1_1, ID3_V2_3, ID3_V2_4
 
-import urllib2 # used to make http requests to lyric databases
+import urllib # used to make http requests to lyric databases
 import re # regular expression library used to strip strings
+from bs4 import BeautifulSoup # DEPENDENCY. Need to install beautiful soup package. Used for html parsing
+
+class bcolors:
+    HEADER = '\033[95m'
+    OKBLUE = '\033[94m'
+    OKGREEN = '\033[92m'
+    WARNING = '\033[93m'
+    FAIL = '\033[91m'
+    ENDC = '\033[0m'
+    BOLD = '\033[1m'
+    UNDERLINE = '\033[4m'
 
 def lyrics_url(e_file):
-    url =  "lyrics.com/"
+    url =  "http://www.lyrics.com/"
 
     # Remove any non ascii characters from the title and artist strings.
     title = e_file.tag.title
@@ -27,8 +39,35 @@ def lyrics_url(e_file):
 
     return url
 
+def lyrics_getLyrics(e_file):
+    "Retrieves lyrics from the 'url' argument. MUST return None \
+    if the song or lyric was not found on the site"
+    url = lyrics_url(e_file)
+    webpage = urllib.urlopen(url)
+    html = webpage.read()
+    soup = BeautifulSoup(html)
+
+    # Search for lyrics div
+    lyrics = soup.find(id="lyric_space")
+
+    # If lyrics div is not present in html, we know that the song does exist on this site
+    if(lyrics is None):
+        return None
+
+    # Song exists on this site.
+    else:
+        lyrics = lyrics.get_text()
+
+        # If stripped "lyric" text is too short, song does not have a lyric record on this site.
+        if(len(lyrics) < 200):
+            return None
+
+        else:
+            return lyrics
+
+
 def azlyrics_url(e_file):
-    url = "azlyrics.com/lyrics/"
+    url = "http://www.azlyrics.com/lyrics/"
 
     # Remove any non ascii characters from title and artist strings.
     title = e_file.tag.title
@@ -48,17 +87,42 @@ def azlyrics_url(e_file):
 
     return url
 
-lyricDatabases = {0 : lyrics_url,
-                  1 : azlyrics_url}
+def azlyrics_getLyrics(e_file):
+    # TODO
+    "Retrieves lyrics from the 'url' argument. MUST return None \
+    if the song or lyric was not found on the site"
+    url = azlyrics_url(e_file)
+    webpage = urllib.urlopen(url)
+    html = webpage.read()
+    soup = BeautifulSoup(html)
+
+    # There should only be one div with the style attribute set in the following way.
+    lyrics = soup.find('div', {"style" : "margin-left:10px;margin-right:10px;"})
+
+    # If no div matches the above attribute, lyrics do no exits on site.
+    if(lyrics is None):
+        return None
+    else:
+        lyrics = lyrics.get_text()
+        return lyrics
+
+
+# Lyric site list
+lyricDatabases = {0 : azlyrics_getLyrics,
+                  1 : lyrics_getLyrics}
 
 
 def generate_lyrics(file):
+    # TODO
     "Generates a lyric url. Searches through each of the available databases \
     until lyrics are found"
 
     e_file = eyed3.load(file)
     for i in lyricDatabases:
-        url = lyricDatabases[i](e_file)
+        lyrics = lyricDatabases[i](e_file)
+        if(lyrics is not None):
+            return lyrics
+    return None
 
 
 def is_mp3_file(file):
@@ -67,17 +131,22 @@ def is_mp3_file(file):
     return (os.path.isfile(file)) and (file.endswith('.mp3'))
 
 def tag_lyric(file):
+    # TODO
     "Tags the file specified in the argument with lyrics. If an invalid file \
     is passed, function will return -1"
     if not(is_mp3_file(file)):
         return -1
 
     lyrics = generate_lyrics(file)
-    #file = urllib2.urlopen(lyric_url)
-    #data = file.read()
-    #file.close()
+    if(lyrics is None):
+        print bcolors.FAIL + "No lyrics found for: " + bcolors.ENDC + file
+        return -1
 
-    #print data
+    print bcolors.OKGREEN + "Lyrics found for: " + bcolors.ENDC + file
+    e_file = eyed3.load(file)
+    e_file.tag.lyrics.set(lyrics)
+
+    e_file.tag.save(file, version=ID3_V2_3)
 
     return
 
@@ -115,9 +184,9 @@ def print_tags(file):
 def test_lyric_urls():
     "This method prints the url formatting of each database with the title \
     and artist strings from stdin. This method relies on the mp3 file       \
-    'test.mp3' existing in the current working directory"
+    'test.mp3' existing in ./test_songs/test.mp3"
 
-    if not(os.path.isfile("test.mp3")):
+    if not(os.path.isfile("test_songs/test.mp3")):
          print "Please make sure the file 'test.mp3' exists in the current", \
          "working directory and is a valid mp3 file"
          exit(0)
@@ -127,7 +196,7 @@ def test_lyric_urls():
     print "mp3 Artist: ",
     artist = raw_input()
 
-    e_file = eyed3.load("test.mp3")
+    e_file = eyed3.load("test_songs/test.mp3")
     # Strings must be converted to unicode before eyed3 will process them
     # even though we encode back to ascii in the url functions. This is okay
     # since this method will only be called during testing.
@@ -143,15 +212,16 @@ def test_lyric_urls():
 parser = argparse.ArgumentParser()
 
 parser.add_argument('-a', action="store_true", default=False,
-help = "Include this argument if you want to manually embed the artist name in the mp3 file")
+help = "Embed the artist name in the mp3 file")
 
 parser.add_argument('-t', action="store_true", default=False,
-help = "Include this argument if you want to manually embed the title name in the mp3 file")
+help = "Embed the title name in the mp3 file")
 
 parser.add_argument('-p', action="store_true", default=False,
-help = "Include this argument if you want to see a print out of each files current tags")
+help = "Print out of each files current tags")
 
-parser.add_argument('--test', action="store_true", default=False)
+parser.add_argument('--test', action="store_true", default=False,
+help = "Prompts for title and artist. Print lyrics from each database given the title and artist")
 
 parser.add_argument('mp3', nargs = '*', help = "Path to mp3 file you want tagged")
 
@@ -175,20 +245,7 @@ try:
         if (args.p):
             print_tags(file)
 
-
         tag_lyric(file)
-
-
-
-    #print audiofile.tag.title
 
 except IOError, msg:
     parser.error(str(msg))
-#print args.mp3
-
-#for mp3file in args["mp3 file"]:
-#    audiofile = eyed3.load(mp3file)
-#    title = audiofile.tag.title
-#    artist =  audiofile.tag.artist
-#    audiofile.tag.lyrics.set(u"""la la la""")
-#    audiofile.tag.save()
