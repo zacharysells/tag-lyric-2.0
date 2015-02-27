@@ -1,1 +1,4 @@
 1.) Make install script
+2.) DEPENDENCIES
+  beautifulSoup
+  eyeD3
