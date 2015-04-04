@@ -43,7 +43,6 @@ def lyrics_url(e_file):
     title = title.encode('ascii', 'ignore')
     title = re.sub('[()\']', '', title)
     artist = artist.encode('ascii', 'ignore')
-
     url = url                           \
         + re.sub(r'\W+', '-', title)    \
         + "-lyrics-"                    \
@@ -72,7 +71,7 @@ def lyrics_getLyrics(e_file):
     # Search for lyrics div
     lyrics = soup.find(id="lyric_space")
 
-    # If lyrics div is not present in html, we know that the song does exist on this site
+    # If lyrics div is not present in html, we know that the song does not exist on this site
     if(lyrics is None):
         return None
 
@@ -102,6 +101,7 @@ def azlyrics_url(e_file):
     title = title.lower()
     artist = artist.encode('ascii', 'ignore')
     artist = artist.lower()
+    artist = re.sub('the', '', artist)
 
     # Strip non alphanumeric characters from title and artist strings.
     url = url                           \
@@ -140,8 +140,8 @@ def azlyrics_getLyrics(e_file):
 
 
 # Lyric site list
-lyricDatabases = {0 : lyrics_getLyrics,
-                  1 : azlyrics_getLyrics}
+lyricDatabases = {0 : azlyrics_getLyrics,
+                  1 : lyrics_getLyrics}
 
 
 def generate_lyrics(file):
@@ -182,7 +182,6 @@ def tag_lyric(file):
         print bcolors.OKGREEN + "Lyrics found for: " + bcolors.ENDC + file
         e_file = eyed3.load(file)
         e_file.tag.lyrics.set(lyrics)
-
         e_file.tag.save(file, version=ID3_V2_3)
 
     return
@@ -223,8 +222,6 @@ def print_tags(file):
         return -1
 
     e_file = eyed3.load(file)
-
-    # Add color to these text outputs source: http://stackoverflow.com/questions/287871/print-in-terminal-with-colors-using-python
     print "-----------------------------------------"
     print "Filename: ", os.path.basename(file)
     print "Song title: ", e_file.tag.title
