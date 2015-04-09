@@ -222,10 +222,10 @@ def generate_lyrics(file):
     until lyrics are found"
 
     e_file = eyed3.load(file)
-    # Randomize lyric stores to avoid repeated requests to the same server
+
+    # Randomize lyric stores to avoid repeated requests to the same server.
     randLyricStores = random.sample(lyricStores.keys(), len(lyricStores.keys()))
     for i in randLyricStores:
-        print bcolors.FAIL +lyricDatabases[i].__name__ + bcolors.ENDC
         lyrics = lyricStores[i](e_file)
         if(lyrics is not None):
             return lyrics
