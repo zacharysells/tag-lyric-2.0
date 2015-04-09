@@ -11,8 +11,10 @@ import urllib # used to make http requests to lyric databases
 import httplib # HTTPerror exception
 import re # regular expression library used to strip strings
 from bs4 import BeautifulSoup # DEPENDENCY. Need to install beautiful soup package. Used for html parsing
+import random
 
-eyed3.log.setLevel("ERROR")
+# Logging
+import time # used to get the date and time
 
 class bcolors:
     HEADER = '\033[95m'
@@ -24,10 +26,26 @@ class bcolors:
     BOLD = '\033[1m'
     UNDERLINE = '\033[4m'
 
-# TODO add log level warnings
+LOGFOLDER = "log/"
 class loglevel:
-    FATAL = bcolors.FAIL
-    WARN = bcolors.WARNING
+    FATAL = bcolors.FAIL + "[FATAL]"
+    WARNING = bcolors.WARNING + "[WARN]"
+    NOTICE = bcolors.OKBLUE + "[NOTICE]"
+
+
+def log(msg, level):
+    "Creates log string composed of date and message and writes it to log file"
+    # If logs are not enabled, do nothing.
+    if(not args.log):
+        return
+    date = time.strftime("%m-%d-%Y")
+    logmsg = level + " - " + bcolors.ENDC \
+        + bcolors.BOLD + date + "::" + time.strftime("%H:%M:%S") + " - " + bcolors.ENDC \
+        + msg;
+
+    FILE = open(LOGFOLDER + date, "a+")
+    FILE.write(logmsg)
+    FILE.write("\n")
 
 def lyrics_url(e_file):
     "Generates url for this lyric website returns None is title or artist are empty"
@@ -49,6 +67,7 @@ def lyrics_url(e_file):
         + re.sub(r'\W+', '-', artist)   \
         + ".html"
 
+    log("lyrics.com URL: " + url, loglevel.NOTICE)
     return url
 
 def lyrics_getLyrics(e_file):
@@ -61,8 +80,7 @@ def lyrics_getLyrics(e_file):
         webpage = urllib.urlopen(url)
 
     except(IOError, httplib.HTTPException):
-        # TODO
-        #log("http response exception caught", loglevel.WARN)
+        log("http response exception caught", loglevel.WARN)
         return None
 
     html = webpage.read()
@@ -110,6 +128,7 @@ def azlyrics_url(e_file):
         + re.sub(r'\W+', '', title)     \
         + ".html"
 
+    log("azlyrics.com URL: " + url, loglevel.NOTICE)
     return url
 
 def azlyrics_getLyrics(e_file):
@@ -122,8 +141,7 @@ def azlyrics_getLyrics(e_file):
         webpage = urllib.urlopen(url)
 
     except (IOError, httplib.HTTPException):
-        # TODO
-        #log("http response exception caught", loglevel.WARN)
+        log("http response exception caught", loglevel.WARN)
         return None
 
     html = webpage.read()
@@ -138,10 +156,65 @@ def azlyrics_getLyrics(e_file):
         lyrics = lyrics.get_text()
         return lyrics
 
+def metrolyrics_url(e_file):
+    "Generates url for this lyric website. Returns None if title or artist are empty"
+
+    url = "http://www.metrolyrics.com/"
+    title = e_file.tag.title
+    artist = e_file.tag.artist
+    if not title or not artist:
+        return None
+
+    title = title.encode('ascii', 'ignore')
+    title = re.sub('[()\']', '', title)
+    artist = artist.encode('ascii', 'ignore')
+    url = url                           \
+        + re.sub(r'\W+', '-', title)    \
+        + "-lyrics-"                    \
+        + re.sub(r'\W+', '-', artist)   \
+        + ".html"
+
+    log("metrolyics.com URL: " + url, loglevel.NOTICE)
+    return url
+
+def metrolyrics_getLyrics(e_file):
+    "Retrieves lyrics from the 'url' argument. MUST return None \
+    if the song or lyric was not found on the site"
+    url = metrolyrics_url(e_file)
+    if url is None:
+        return None
+    try:
+        webpage = urllib.urlopen(url)
+
+    except(IOError, httplib.HTTPException):
+        log("http response exception caught", loglevel.WARN)
+        return None
+
+    html = webpage.read()
+    soup = BeautifulSoup(html)
+
+    # Search for lyrics div
+    lyrics = soup.find(id="lyrics-body-text")
+
+    # If lyrics div is not present in html, we know that the song does not exist on this site
+    if(lyrics is None):
+        return None
+
+    # Song exists on this site.
+    else:
+        lyrics = lyrics.get_text()
+
+        # If stripped "lyric" text is too short, song does not have a lyric record on this site.
+        if(len(lyrics) < 200):
+            return None
+
+        else:
+            return lyrics
 
 # Lyric site list
-lyricDatabases = {0 : azlyrics_getLyrics,
-                  1 : lyrics_getLyrics}
+lyricStores = {0 : azlyrics_getLyrics,
+               1 : lyrics_getLyrics,
+               2 : metrolyrics_getLyrics}
 
 
 def generate_lyrics(file):
@@ -149,8 +222,11 @@ def generate_lyrics(file):
     until lyrics are found"
 
     e_file = eyed3.load(file)
-    for i in lyricDatabases:
-        lyrics = lyricDatabases[i](e_file)
+    # Randomize lyric stores to avoid repeated requests to the same server
+    randLyricStores = random.sample(lyricStores.keys(), len(lyricStores.keys()))
+    for i in randLyricStores:
+        print bcolors.FAIL +lyricDatabases[i].__name__ + bcolors.ENDC
+        lyrics = lyricStores[i](e_file)
         if(lyrics is not None):
             return lyrics
     return None
@@ -168,17 +244,18 @@ def tag_lyric(file):
     tag_lyric.count += 1
     print("(%d/%d)" % (tag_lyric.count ,nfiles)),
     if not(is_mp3_file(file)):
+        log("Invalid file: " + file, loglevel.WARNING)
         print bcolors.FAIL + "Invalid file: " + bcolors.ENDC + file
         return -1
 
     lyrics = generate_lyrics(file)
     if(lyrics is None):
-        # TODO turn this into log
+        log("No lyrics found for: " + file, loglevel.NOTICE)
         print bcolors.FAIL + "No lyrics found for: " + bcolors.ENDC + file
         return -1
 
     else:
-        # TODO turn this into log
+        log("Lyrics found for: " + file, loglevel.NOTICE)
         print bcolors.OKGREEN + "Lyrics found for: " + bcolors.ENDC + file
         e_file = eyed3.load(file)
         e_file.tag.lyrics.set(lyrics)
@@ -269,9 +346,13 @@ def count_file_args(args):
 
 parser = argparse.ArgumentParser()
 
+parser.add_argument('--log', action="store_true", default=False,
+help = "Enables logging to specified directory")
+
 parser.add_argument('-p', action="store_true", default=False,
 help = "Print each files current tags")
 
+# TODO
 parser.add_argument('-u', action="store_true", default=False,
 help = "Print generated URLs for each file. Used for debugging")
 
