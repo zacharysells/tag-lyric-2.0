@@ -84,7 +84,7 @@ def lyrics_getLyrics(e_file):
         return None
 
     html = webpage.read()
-    soup = BeautifulSoup(html)
+    soup = BeautifulSoup(html, "html.parser")
 
     # Search for lyrics div
     lyrics = soup.find(id="lyric_space")
@@ -145,7 +145,7 @@ def azlyrics_getLyrics(e_file):
         return None
 
     html = webpage.read()
-    soup = BeautifulSoup(html)
+    soup = BeautifulSoup(html, "html.parser")
     # There should only be one div with the style attribute set in the following way.
     lyrics = soup.find('div', {"style" : "margin-left:10px;margin-right:10px;"})
 
@@ -191,7 +191,7 @@ def metrolyrics_getLyrics(e_file):
         return None
 
     html = webpage.read()
-    soup = BeautifulSoup(html)
+    soup = BeautifulSoup(html, "html.parser")
 
     # Search for lyrics div
     lyrics = soup.find(id="lyrics-body-text")
