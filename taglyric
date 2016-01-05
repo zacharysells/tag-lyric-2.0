@@ -252,6 +252,12 @@ def tag_lyric(file):
         print bcolors.FAIL + "Invalid file: " + bcolors.ENDC + file
         return -1
 
+    e_file = eyed3.load(file)
+    if len(e_file.tag.lyrics) > 0:
+        log("Lyrics already tagged for: %s" % file, loglevel.NOTICE)
+        print bcolors.OKGREEN + "Lyrics already tagged for: " + bcolors.ENDC + file
+        return -1
+
     lyrics = generate_lyrics(file)
     if(lyrics is None):
         log("No lyrics found for: " + file, loglevel.NOTICE)
@@ -331,7 +337,6 @@ def test_lyric_urls():
     # since this method will only be called during testing.
     e_file.tag.title = unicode(title, "UTF-8")
     e_file.tag.artist = unicode(artist, "UTF-8")
-
     e_file.tag.save()
 
     for i in lyricDatabases:
