@@ -26,7 +26,6 @@ class bcolors:
     BOLD = '\033[1m'
     UNDERLINE = '\033[4m'
 
-LOGFOLDER = "log/"
 class loglevel:
     FATAL = bcolors.FAIL + "[FATAL]"
     WARNING = bcolors.WARNING + "[WARN]"
@@ -36,12 +35,13 @@ class loglevel:
 def log(msg, level):
     "Creates log string composed of date and message and writes it to log file"
     # If logs are not enabled, do nothing.
-    if(not args.log):
-        return
     date = time.strftime("%m-%d-%Y")
     logmsg = level + " - " + bcolors.ENDC \
         + bcolors.BOLD + date + "::" + time.strftime("%H:%M:%S") + " - " + bcolors.ENDC \
         + msg;
+
+    if not os.path.exists(args.log):
+        os.makedirs(args.log)
 
     FILE = open(LOGFOLDER + date, "a+")
     FILE.write(logmsg)
@@ -80,7 +80,7 @@ def lyrics_getLyrics(e_file):
         webpage = urllib.urlopen(url)
 
     except(IOError, httplib.HTTPException):
-        log("http response exception caught", loglevel.WARN)
+        log("http response exception caught", loglevel.WARNING)
         return None
 
     html = webpage.read()
@@ -141,7 +141,7 @@ def azlyrics_getLyrics(e_file):
         webpage = urllib.urlopen(url)
 
     except (IOError, httplib.HTTPException):
-        log("http response exception caught", loglevel.WARN)
+        log("http response exception caught", loglevel.WARNING)
         return None
 
     html = webpage.read()
@@ -187,7 +187,7 @@ def metrolyrics_getLyrics(e_file):
         webpage = urllib.urlopen(url)
 
     except(IOError, httplib.HTTPException):
-        log("http response exception caught", loglevel.WARN)
+        log("http response exception caught", loglevel.WARNING)
         return None
 
     html = webpage.read()
@@ -222,12 +222,16 @@ def generate_lyrics(file):
     until lyrics are found"
 
     e_file = eyed3.load(file)
+    if not e_file.tag:
+        # No ID3 tags present in file.
+        return None
 
     # Randomize lyric stores to avoid repeated requests to the same server.
     randLyricStores = random.sample(lyricStores.keys(), len(lyricStores.keys()))
     for i in randLyricStores:
         lyrics = lyricStores[i](e_file)
         if(lyrics is not None):
+            log("Using lyrics from " + "FILLTHISOUT", loglevel.NOTICE)
             return lyrics
     return None
 
@@ -258,6 +262,7 @@ def tag_lyric(file):
         log("Lyrics found for: " + file, loglevel.NOTICE)
         print bcolors.OKGREEN + "Lyrics found for: " + bcolors.ENDC + file
         e_file = eyed3.load(file)
+
         e_file.tag.lyrics.set(lyrics)
         e_file.tag.save(file, version=ID3_V2_3)
 
@@ -346,7 +351,7 @@ def count_file_args(args):
 
 parser = argparse.ArgumentParser()
 
-parser.add_argument('--log', action="store_true", default=False,
+parser.add_argument('--log', default="/usr/local/var/taglyric/logs/",
 help = "Enables logging to specified directory")
 
 parser.add_argument('-p', action="store_true", default=False,
@@ -370,6 +375,9 @@ help = "Path to mp3 file you want tagged")
 
 try:
     args = parser.parse_args()
+
+    global LOGFOLDER
+    LOGFOLDER = args.log
 
     if (args.test):
         test_lyric_urls()
