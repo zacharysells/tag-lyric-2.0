@@ -231,7 +231,7 @@ class Tagger(object):
 
     def get(self, args):
         """
-        usage: mp3 get <TITLE>:<ARTIST>
+        usage: taglyric get <TITLE>:<ARTIST>
 
         Attempt to download an mp3 file
         """
@@ -239,7 +239,7 @@ class Tagger(object):
 
     def tag(self, args):
         """
-        usage: mp3 tag [file1.mp3, file2.mp3, ...]
+        usage: taglyric tag [file1.mp3, file2.mp3, ...]
 
         Tag an mp3 file with lyrics.
         """
@@ -353,7 +353,7 @@ def print_help():
     Print help text
     """
 
-    print """usage mp3 COMMAND <args>
+    print """usage taglyric COMMAND <args>
 
     Available commands:
 
@@ -361,7 +361,7 @@ def print_help():
     {:10s}Tag an mp3 file
     {:10s}Print this help menu
 
-    For help on any individual command, type mp3 COMMAND --help
+    For help on any individual command, type taglyric COMMAND --help
     """.format("get", "tag", "help")
 
 def main():
