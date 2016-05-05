@@ -1,0 +1,4 @@
+eyed3
+colorama
+requests
+bs4
